@@ -1,23 +1,25 @@
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
 
-function createWindow() {
+function createLauncher() {
     const win = new BrowserWindow({
-        width: 400,
-        height: 300,
-        transparent: true,
+        width: 420,
+        height: 580,
         frame: false,
-        alwaysOnTop: true,
+        transparent: true,
+        resizable: false,
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false
         }
     });
 
-    win.loadFile(path.join(__dirname, 'index.html'));
+    win.loadFile('./src/renderer/launcher/index.html');
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+    createLauncher();
+});
 
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {

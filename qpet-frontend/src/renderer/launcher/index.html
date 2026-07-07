@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>qPet 启动器</title>
+    <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+    <!-- 顶部拖拽栏 -->
+    <div class="title-bar">
+        <span class="title">✨ qPet</span>
+        <div class="window-controls">
+            <button class="btn-minimize" id="minimizeBtn">─</button>
+            <button class="btn-close" id="closeBtn">✕</button>
+        </div>
+    </div>
+
+    <!-- 内容区域 -->
+    <div class="container">
+        <!-- 左侧：宠物展示 -->
+        <div class="pet-display">
+            <div class="pet-avatar">
+                <img src="./assets/logo.png" alt="qPet" class="pet-avatar-img">
+            </div>
+            <div class="pet-name">小艾</div>
+        </div>
+
+        <!-- 右侧：登录/注册表单 -->
+        <div class="auth-panel">
+            <div class="tab-switch">
+                <span class="tab active" data-tab="login">登录</span>
+                <span class="tab" data-tab="register">注册</span>
+            </div>
+
+            <!-- 登录表单 -->
+            <form id="loginForm">
+                <input type="text" placeholder="用户名" id="loginUsername">
+                <input type="password" placeholder="密码" id="loginPassword">
+                <button type="submit">登录</button>
+                <div class="error-msg" id="loginError"></div>
+            </form>
+
+            <!-- 注册表单（默认隐藏） -->
+            <form id="registerForm" style="display:none;">
+                <input type="text" placeholder="用户名" id="regUsername">
+                <input type="password" placeholder="密码（至少6位）" id="regPassword">
+                <button type="submit">注册</button>
+                <div class="error-msg" id="regError"></div>
+            </form>
+        </div>
+    </div>
+
+    <script src="./renderer.js"></script>
+</body>
+</html>
