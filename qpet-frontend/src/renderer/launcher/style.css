@@ -173,3 +173,15 @@ body {
     border-radius: 50%;
     object-fit: cover;
 }
+
+.error-msg {
+    font-size: 13px;
+    color: #e74c3c;
+    min-height: 20px;
+    transition: opacity 0.5s ease;
+    opacity: 1;
+}
+
+.error-msg.fade-out {
+    opacity: 0;
+}
