@@ -21,7 +21,7 @@ public class ChatController {
 
     @PostMapping
     public Result<ChatResponse> chat(
-            @RequestHeader("X-User-Id") Integer userId,
+            @RequestAttribute("userId") Integer userId,
             @RequestBody ChatRequest request) {
         // 参数校验
         if (userId == null) {
@@ -39,7 +39,7 @@ public class ChatController {
 
     @GetMapping("/history/{petId}")
     public Result<List<ChatMessage>> getHistory(
-            @RequestHeader("X-User-Id") Integer userId,
+            @RequestAttribute("userId") Integer userId,
             @PathVariable Integer petId) {
         if (userId == null || petId == null) {
             return Result.error(400, "参数不完整");

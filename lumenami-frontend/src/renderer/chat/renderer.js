@@ -62,6 +62,7 @@ let ws = null;
 let wsConnected = false;
 let heartbeatInterval = null;
 let reconnectAttempts = 0;
+let currentConnectionId = 0; // 连接 ID，用于区分新旧连接
 const MAX_RECONNECT_ATTEMPTS = 5;
 const HEARTBEAT_INTERVAL = 30000; // 30秒心跳间隔
 const RECONNECT_DELAY = 3000; // 重连延迟 3秒
@@ -86,10 +87,18 @@ function connectWebSocket() {
         ws.close();
     }
 
-    const wsUrl = `ws://localhost:8080/ws/chat?userId=${userId}`;
+    // 递增连接 ID，旧连接的 onclose 会检测到 ID 不匹配而跳过重连
+    const myConnectionId = ++currentConnectionId;
+    
+    const wsUrl = `ws://localhost:8080/ws/chat?userId=${userId}&token=${localStorage.getItem('token') || ''}`;
     ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
+        // 如果已经有更新的连接，忽略这个
+        if (myConnectionId !== currentConnectionId) {
+            ws.close();
+            return;
+        }
         console.log('WebSocket 连接已建立');
         wsConnected = true;
         reconnectAttempts = 0;
@@ -112,10 +121,24 @@ function connectWebSocket() {
     };
 
     ws.onclose = () => {
+        // 如果已经有更新的连接，不触发重连（防止旧连接干扰新连接）
+        if (myConnectionId !== currentConnectionId) {
+            console.log('旧连接关闭，忽略（已有新连接）');
+            return;
+        }
+        
         console.log('WebSocket 连接已关闭');
         wsConnected = false;
         stopHeartbeat();
         updateConnectionStatus('disconnected');
+        
+        // 重置等待状态，防止 typing 指示器卡住
+        if (isWaitingResponse) {
+            removeTypingIndicator();
+            appendMessage('ai', '网络连接已断开，请等待重连后重试');
+            isWaitingResponse = false;
+            sendBtn.disabled = !messageInput.value.trim();
+        }
         
         // 尝试重连
         if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
@@ -233,6 +256,27 @@ if (minimizeBtn) {
 
 // ===== 接收宠物信息 =====
 ipcRenderer.on('set-pet-info', (event, petInfo) => {
+    // 重置状态，防止切换宠物时残留旧聊天记录
+    conversationHistory = [];
+    lastMessageDate = null;
+    isWaitingResponse = false;
+    
+    // 关闭旧的 WebSocket 连接（递增连接 ID 使旧连接自动失效）
+    if (ws) {
+        ws.close();
+        ws = null;
+    }
+    
+    // 清空聊天区域 DOM
+    if (chatArea) {
+        chatArea.innerHTML = '';
+    }
+    
+    // 显示欢迎消息，隐藏加载状态
+    if (welcomeMsg) {
+        welcomeMsg.style.display = '';
+    }
+    
     currentPet = petInfo;
     if (petNameEl) {
         petNameEl.textContent = petInfo.name || 'LumenAmi';
@@ -255,7 +299,7 @@ async function loadHistory() {
         const response = await fetch(`http://localhost:8080/api/chat/history/${currentPet.petId}`, {
             headers: {
                 'Content-Type': 'application/json',
-                'X-User-Id': userId
+                'Authorization': 'Bearer ' + (localStorage.getItem('token') || '')
             }
         });
         const result = await response.json();
@@ -532,7 +576,7 @@ async function loadMemories() {
         const response = await fetch(`http://localhost:8080/api/memories/pet/${currentPet.petId}`, {
             headers: {
                 'Content-Type': 'application/json',
-                'X-User-Id': userId
+                'Authorization': 'Bearer ' + (localStorage.getItem('token') || '')
             }
         });
         const result = await response.json();
@@ -655,7 +699,7 @@ if (confirmAddMemory) {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-User-Id': userId
+                    'Authorization': 'Bearer ' + (localStorage.getItem('token') || '')
                 },
                 body: JSON.stringify({
                     petId: currentPet.petId,
@@ -734,7 +778,7 @@ if (confirmEditMemory) {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-User-Id': userId
+                    'Authorization': 'Bearer ' + (localStorage.getItem('token') || '')
                 },
                 body: JSON.stringify({ value, importance })
             });
@@ -772,7 +816,7 @@ window.deleteMemory = async function(id, label) {
             method: 'DELETE',
             headers: {
                 'Content-Type': 'application/json',
-                'X-User-Id': userId
+                'Authorization': 'Bearer ' + (localStorage.getItem('token') || '')
             }
         });
         const result = await response.json();
@@ -805,7 +849,7 @@ window.viewHistory = async function(key) {
         const response = await fetch(`http://localhost:8080/api/memories/pet/${currentPet.petId}/history/${key}`, {
             headers: {
                 'Content-Type': 'application/json',
-                'X-User-Id': userId
+                'Authorization': 'Bearer ' + (localStorage.getItem('token') || '')
             }
         });
         const result = await response.json();

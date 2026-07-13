@@ -1,9 +1,11 @@
 package com.lumenami.backend.websocket;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lumenami.backend.config.JwtUtil;
 import com.lumenami.backend.dto.ChatRequest;
 import com.lumenami.backend.dto.ChatResponse;
 import com.lumenami.backend.service.ChatService;
+import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -26,6 +28,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
     private final WebSocketSessionManager sessionManager;
     private final ChatService chatService;
+    private final JwtUtil jwtUtil;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
@@ -35,18 +38,44 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
     /**
      * 连接建立后处理
-     * 从 URL 参数中提取 userId
+     * 从 URL 参数中提取 token 或 userId
      */
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
-        // 从 URI 查询参数中提取 userId
+        // 从 URI 查询参数中提取 token 和 userId
         String query = session.getUri().getQuery();
-        Integer userId = extractUserIdFromQuery(query);
+        String token = extractParamFromQuery(query, "token");
+        Integer userId = null;
+
+        // 优先使用 JWT token 验证（安全方式）
+        if (token != null && !token.isEmpty()) {
+            Claims claims = jwtUtil.validateToken(token);
+            if (claims != null) {
+                userId = jwtUtil.getUserIdFromToken(claims);
+                log.info("WebSocket JWT 认证成功: userId={}", userId);
+            } else {
+                log.warn("WebSocket 连接 token 无效: sessionId={}", session.getId());
+                session.sendMessage(new TextMessage(objectMapper.writeValueAsString(
+                        WebSocketMessage.error("token 无效或已过期"))));
+                session.close(CloseStatus.BAD_DATA);
+                return;
+            }
+        }
+
+        // 向后兼容：如果没有 token，尝试从 userId 参数获取（仅开发环境）
+        if (userId == null) {
+            Integer queryUserId = extractUserIdFromQuery(query);
+            if (queryUserId != null) {
+                log.warn("WebSocket 使用 userId 参数连接（无 token），仅建议开发环境使用: userId={}, sessionId={}", 
+                        queryUserId, session.getId());
+                userId = queryUserId;
+            }
+        }
 
         if (userId == null) {
-            log.warn("WebSocket 连接缺少 userId 参数，关闭连接: sessionId={}", session.getId());
+            log.warn("WebSocket 连接缺少认证参数，关闭连接: sessionId={}", session.getId());
             session.sendMessage(new TextMessage(objectMapper.writeValueAsString(
-                    WebSocketMessage.error("缺少 userId 参数"))));
+                    WebSocketMessage.error("缺少认证参数"))));
             session.close(CloseStatus.BAD_DATA);
             return;
         }
@@ -178,20 +207,31 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     }
 
     /**
-     * 从 URL 查询参数中提取 userId
+     * 从 URL 查询参数中提取 userId（向后兼容）
      */
     private Integer extractUserIdFromQuery(String query) {
+        String userIdStr = extractParamFromQuery(query, "userId");
+        if (userIdStr != null) {
+            try {
+                return Integer.parseInt(userIdStr);
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 从 URL 查询参数中提取指定参数
+     */
+    private String extractParamFromQuery(String query, String paramName) {
         if (query == null || query.isEmpty()) {
             return null;
         }
         for (String param : query.split("&")) {
             String[] pair = param.split("=");
-            if (pair.length == 2 && "userId".equals(pair[0])) {
-                try {
-                    return Integer.parseInt(pair[1]);
-                } catch (NumberFormatException e) {
-                    return null;
-                }
+            if (pair.length == 2 && paramName.equals(pair[0])) {
+                return pair[1];
             }
         }
         return null;

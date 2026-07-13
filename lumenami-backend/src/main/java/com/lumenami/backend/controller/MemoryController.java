@@ -23,7 +23,7 @@ public class MemoryController {
      */
     @GetMapping("/pet/{petId}")
     public Result<List<PetMemory>> getMemories(
-            @RequestHeader("X-User-Id") Integer userId,
+            @RequestAttribute("userId") Integer userId,
             @PathVariable Integer petId) {
         // 校验用户是否拥有该宠物
         memoryService.verifyPetOwnership(userId, petId);
@@ -36,7 +36,7 @@ public class MemoryController {
      */
     @GetMapping("/pet/{petId}/history/{key}")
     public Result<List<PetMemory>> getMemoryHistory(
-            @RequestHeader("X-User-Id") Integer userId,
+            @RequestAttribute("userId") Integer userId,
             @PathVariable Integer petId,
             @PathVariable String key) {
         // 校验用户是否拥有该宠物
@@ -50,7 +50,7 @@ public class MemoryController {
      */
     @DeleteMapping("/{id}")
     public Result<Void> deleteMemory(
-            @RequestHeader("X-User-Id") Integer userId,
+            @RequestAttribute("userId") Integer userId,
             @PathVariable Integer id) {
         memoryService.deleteMemory(userId, id);
         return Result.success(null);
@@ -61,7 +61,7 @@ public class MemoryController {
      */
     @PutMapping("/{id}")
     public Result<Void> updateMemory(
-            @RequestHeader("X-User-Id") Integer userId,
+            @RequestAttribute("userId") Integer userId,
             @PathVariable Integer id,
             @RequestBody UpdateMemoryRequest request) {
         memoryService.updateMemory(userId, id, request.getValue(), request.getImportance());
@@ -73,7 +73,7 @@ public class MemoryController {
      */
     @PostMapping
     public Result<Void> addMemory(
-            @RequestHeader("X-User-Id") Integer userId,
+            @RequestAttribute("userId") Integer userId,
             @RequestBody AddMemoryRequest request) {
         // 参数校验
         if (request.getPetId() == null) {

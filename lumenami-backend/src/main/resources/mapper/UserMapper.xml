@@ -12,4 +12,8 @@
         VALUES (#{username}, #{password})
     </insert>
 
+    <update id="updatePassword">
+        UPDATE users SET password = #{password} WHERE id = #{id}
+    </update>
+
 </mapper>

@@ -76,12 +76,11 @@ function createFloating() {
 let chatWindow = null;
 
 function createChatWindow(petInfo) {
-    if (chatWindow) {
+    if (chatWindow && !chatWindow.isDestroyed()) {
+        // 复用已有窗口，只发送新宠物信息（不销毁重建，避免 WebSocket 断连）
         chatWindow.show();
         chatWindow.focus();
-        if (petInfo) {
-            chatWindow.webContents.send('set-pet-info', petInfo);
-        }
+        chatWindow.webContents.send('set-pet-info', petInfo);
         return chatWindow;
     }
 
@@ -111,7 +110,10 @@ function createChatWindow(petInfo) {
     });
 
     chatWindow.on('closed', () => {
-        chatWindow = null;
+        // 防止旧窗口的 closed 事件清空新窗口引用（竞态保护）
+        if (chatWindow === this) {
+            chatWindow = null;
+        }
     });
 
     return chatWindow;
@@ -142,6 +144,11 @@ ipcMain.on('open-launcher', () => {
     if (floatingWindow) {
         floatingWindow.close();
         floatingWindow = null;
+    }
+    // 同时关闭聊天窗口，防止旧 WebSocket 连接残留
+    if (chatWindow) {
+        chatWindow.close();
+        chatWindow = null;
     }
     createLauncher(true);
 });

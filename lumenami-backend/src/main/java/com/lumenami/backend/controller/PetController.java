@@ -21,21 +21,21 @@ public class PetController {
 
     @PostMapping
     public Result<PetResponse> createPet(
-            @RequestHeader("X-User-Id") Integer userId,
+            @RequestAttribute("userId") Integer userId,
             @RequestBody CreatePetRequest request) {
         PetResponse pet = petService.createPet(userId, request);
         return Result.success(pet);
     }
 
     @GetMapping
-    public Result<List<PetResponse>> listPets(@RequestHeader("X-User-Id") Integer userId) {
+    public Result<List<PetResponse>> listPets(@RequestAttribute("userId") Integer userId) {
         List<PetResponse> pets = petService.getPetsByUserId(userId);
         return Result.success(pets);
     }
 
     @PatchMapping("/{petId}/activate")
     public Result<PetResponse> activatePet(
-            @RequestHeader("X-User-Id") Integer userId,
+            @RequestAttribute("userId") Integer userId,
             @PathVariable Integer petId) {
         PetResponse pet = petService.switchPet(userId, petId);
         return Result.success(pet);
@@ -43,7 +43,7 @@ public class PetController {
 
     @DeleteMapping("/{petId}")
     public Result<String> deletePet(
-            @RequestHeader("X-User-Id") Integer userId,
+            @RequestAttribute("userId") Integer userId,
             @PathVariable Integer petId) {
         petService.deletePet(userId, petId);
         return Result.success("删除成功");
@@ -54,7 +54,7 @@ public class PetController {
      */
     @PostMapping("/understand-role")
     public Result<String> understandRole(
-            @RequestHeader("X-User-Id") Integer userId,
+            @RequestAttribute("userId") Integer userId,
             @RequestBody UnderstandRoleRequest request) {
         if (userId == null) {
             return Result.error(400, "未登录");

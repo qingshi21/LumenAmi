@@ -19,7 +19,7 @@ async function fetchActivePet() {
         const response = await fetch('http://localhost:8080/api/pets', {
             headers: {
                 'Content-Type': 'application/json',
-                'X-User-Id': userId
+                'Authorization': 'Bearer ' + (localStorage.getItem('token') || '')
             }
         });
         const result = await response.json();

@@ -7,4 +7,5 @@ import org.apache.ibatis.annotations.Mapper;
 public interface UserMapper {
     User findByUsername(String username);
     void insert(User user);
+    void updatePassword(@org.apache.ibatis.annotations.Param("id") Integer id, @org.apache.ibatis.annotations.Param("password") String password);
 }

@@ -115,12 +115,15 @@ loginForm.addEventListener('submit', async (e) => {
             currentUserId = result.data.userId;
             localStorage.setItem('userId', currentUserId);
             localStorage.setItem('username', result.data.username);
+            localStorage.setItem('token', result.data.token);
 
             showMessage('loginError', '✅ 登录成功！', true);
             // 延迟一点切换到宠物列表
             setTimeout(() => {
                 showPetList();
             }, 300);
+        } else {
+            showMessage('loginError', result.message || '登录失败');
         }
         
     } catch (err) {
@@ -182,7 +185,7 @@ registerForm.addEventListener('submit', async (e) => {
 function apiHeaders() {
     return {
         'Content-Type': 'application/json',
-        'X-User-Id': String(localStorage.getItem('userId') || '')
+        'Authorization': 'Bearer ' + (localStorage.getItem('token') || '')
     };
 }
 
