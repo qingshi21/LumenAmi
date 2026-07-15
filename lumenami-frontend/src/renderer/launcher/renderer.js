@@ -189,7 +189,54 @@ function apiHeaders() {
     };
 }
 
-// ===== 宠物列表相关 =====
+// ===== 删除确认弹窗管理 =====
+const deleteConfirmModal = document.getElementById('deleteConfirmModal');
+const closeDeleteConfirmBtn = document.getElementById('closeDeleteConfirmBtn');
+const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+const deleteConfirmText = document.getElementById('deleteConfirmText');
+
+let pendingDeletePetId = null;
+
+// 打开删除确认弹窗
+function openDeleteConfirm(petId, petName) {
+    pendingDeletePetId = petId;
+    deleteConfirmText.textContent = `确定要删除「${petName}」吗？`;
+    deleteConfirmModal.classList.add('show');
+}
+
+// 关闭删除确认弹窗
+function closeDeleteConfirm() {
+    deleteConfirmModal.classList.remove('show');
+    pendingDeletePetId = null;
+}
+
+// 绑定关闭按钮
+if (closeDeleteConfirmBtn) {
+    closeDeleteConfirmBtn.addEventListener('click', closeDeleteConfirm);
+}
+
+if (cancelDeleteBtn) {
+    cancelDeleteBtn.addEventListener('click', closeDeleteConfirm);
+}
+
+// 点击遮罩关闭
+if (deleteConfirmModal) {
+    deleteConfirmModal.addEventListener('click', (e) => {
+        if (e.target === deleteConfirmModal) closeDeleteConfirm();
+    });
+}
+
+// 确认删除
+if (confirmDeleteBtn) {
+    confirmDeleteBtn.addEventListener('click', async () => {
+        if (!pendingDeletePetId) return;
+        
+        const petId = pendingDeletePetId;
+        closeDeleteConfirm();
+        await deletePet(petId);
+    });
+}
 const petListContainer = document.getElementById('petListContainer');
 const petListEl = document.getElementById('petList');
 const createPetBtn = document.getElementById('createPetBtn');
@@ -264,8 +311,8 @@ function renderPetList() {
             e.stopPropagation();
             const petId = parseInt(btn.dataset.petId);
             const pet = pets.find(p => p.petId === petId);
-            if (pet && confirm(`确定要删除「${pet.name}」吗？`)) {
-                deletePet(petId);
+            if (pet) {
+                openDeleteConfirm(petId, pet.name);
             }
         });
     });
@@ -454,6 +501,49 @@ let storedAiUnderstanding = '';
 // 存储用户原始描述（用于勾选框显示）
 let storedUserDescription = '';
 
+// ===== AI 理解警告弹窗 =====
+const aiWarningModal = document.getElementById('aiWarningModal');
+const confirmAiWarningBtn = document.getElementById('confirmAiWarningBtn');
+const cancelAiWarningBtn = document.getElementById('cancelAiWarningBtn');
+const closeAiWarningBtn = document.getElementById('closeAiWarningBtn');
+let aiWarningResolve = null; // Promise resolve 回调
+
+function showAiWarning() {
+    return new Promise((resolve) => {
+        aiWarningResolve = resolve;
+        aiWarningModal.style.display = 'flex';
+        requestAnimationFrame(() => {
+            aiWarningModal.classList.add('show');
+        });
+    });
+}
+
+function closeAiWarning(result) {
+    aiWarningModal.classList.remove('show');
+    setTimeout(() => {
+        aiWarningModal.style.display = 'none';
+    }, 250);
+    if (aiWarningResolve) {
+        aiWarningResolve(result);
+        aiWarningResolve = null;
+    }
+}
+
+if (confirmAiWarningBtn) {
+    confirmAiWarningBtn.addEventListener('click', () => closeAiWarning(true));
+}
+if (cancelAiWarningBtn) {
+    cancelAiWarningBtn.addEventListener('click', () => closeAiWarning(false));
+}
+if (closeAiWarningBtn) {
+    closeAiWarningBtn.addEventListener('click', () => closeAiWarning(false));
+}
+if (aiWarningModal) {
+    aiWarningModal.addEventListener('click', (e) => {
+        if (e.target === aiWarningModal) closeAiWarning(false);
+    });
+}
+
 if (understandRoleBtn) {
     understandRoleBtn.addEventListener('click', async () => {
         const name = document.getElementById('petNameInput').value.trim();
@@ -484,11 +574,29 @@ if (understandRoleBtn) {
             const result = await response.json();
             
             if (result.code === 200) {
+                let aiText = result.data;
+                let hasWarning = false;
+                
+                // 检测是否包含警告前缀
+                if (aiText.startsWith('[WARNING]')) {
+                    hasWarning = true;
+                    aiText = aiText.substring('[WARNING]'.length).trim();
+                }
+                
+                // 如果有警告，先弹窗确认
+                if (hasWarning) {
+                    const confirmed = await showAiWarning();
+                    if (!confirmed) {
+                        // 用户取消，不填入
+                        return;
+                    }
+                }
+                
                 // 保存用户原始描述
                 storedUserDescription = description;
                 
                 // 将 AI 理解结果填入编辑框
-                aiUnderstandingTextarea.value = result.data;
+                aiUnderstandingTextarea.value = aiText;
                 
                 // 显示编辑模态框
                 editUnderstandingModal.classList.add('show');

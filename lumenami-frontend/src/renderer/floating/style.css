@@ -1,98 +1,132 @@
-* { margin: 0; padding: 0; box-sizing: border-box; }
-
-body {
-    background: transparent;
-    width: 200px;
-    height: 200px;
-    user-select: none;
+/* ===== 拖拽区域 ===== */
+.drag-area {
+    position: fixed;
     -webkit-app-region: drag;
+    z-index: 10;
 }
 
-.drag-bar {
+.drag-area.top {
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 20px;  /* 顶部拖拽条 */
+}
+
+.drag-area.left {
+    top: 20px;
+    left: 0;
+    width: 15px;  /* 左侧拖拽条 */
+    height: calc(100% - 40px);  /* 减去顶部和底部 */
+}
+
+.drag-area.right {
+    top: 20px;
+    right: 0;
+    width: 15px;  /* 右侧拖拽条 */
+    height: calc(100% - 40px);
+}
+
+/* ===== Live2D 容器 ===== */
+#live2d-container {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    -webkit-app-region: drag;
-    z-index: 1;
+    z-index: 5;  /* 提高层级，确保能接收鼠标事件 */
 }
 
+#live2d-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;  /* 显示手型光标 */
+    touch-action: auto !important;  /* 允许触摸和鼠标事件 */
+}
+
+/* ===== 关闭按钮 ===== */
 .close-btn {
     position: fixed;
-    top: 4px;
-    right: 4px;
-    width: 20px;
-    height: 20px;
+    top: 8px;
+    right: 8px;
+    width: 24px;
+    height: 24px;
     border-radius: 50%;
-    background: rgba(0,0,0,0.3);
+    background: rgba(0, 0, 0, 0.25);
     color: #fff;
-    font-size: 10px;
+    font-size: 12px;
     border: none;
     cursor: pointer;
     z-index: 10;
-    -webkit-app-region: no-drag;
+    transition: background 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 .close-btn:hover {
     background: #e74c3c;
 }
 
-.pet {
-    position: absolute;
-    bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 150px;
-    height: 150px;
-    object-fit: contain;
-    cursor: pointer;
-    -webkit-app-region: no-drag;
-    z-index: 5;
-    pointer-events: auto;
-}
-.pet:hover {
-    transform: translateX(-50%) scale(1.08);
-}
-
-/* 右键菜单 */
+/* ===== 右键菜单 ===== */
 .context-menu {
     display: none;
     position: fixed;
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(12px);
-    border-radius: 10px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-    padding: 4px 0;
-    min-width: 140px;
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+    padding: 6px 0;
+    min-width: 150px;
     z-index: 100;
     overflow: hidden;
     animation: menuFadeIn 0.15s ease;
+    border: 1px solid rgba(255, 255, 255, 0.2);
 }
 .context-menu.show {
     display: block;
 }
 
 @keyframes menuFadeIn {
-    from { opacity: 0; transform: scale(0.95); }
-    to   { opacity: 1; transform: scale(1); }
+    from { opacity: 0; transform: scale(0.96) translateY(-4px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 .menu-item {
-    padding: 8px 16px;
+    padding: 10px 18px;
     font-size: 13px;
-    color: #333;
+    font-weight: 500;
+    color: #1a1a2e;
     cursor: pointer;
-    transition: background 0.15s;
+    transition: background 0.15s, color 0.15s;
     -webkit-app-region: no-drag;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 .menu-item:hover {
-    background: rgba(108, 92, 231, 0.1);
+    background: rgba(108, 92, 231, 0.08);
     color: #6c5ce7;
 }
 .menu-item.menu-danger {
     color: #e74c3c;
 }
 .menu-item.menu-danger:hover {
-    background: rgba(231, 76, 60, 0.1);
+    background: rgba(231, 76, 60, 0.08);
     color: #c0392b;
+}
+
+/* ===== 滚动条美化 ===== */
+::-webkit-scrollbar {
+    width: 4px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: rgba(108, 92, 231, 0.3);
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(108, 92, 231, 0.5);
 }

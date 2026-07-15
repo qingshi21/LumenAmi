@@ -64,7 +64,8 @@ function createFloating() {
     });
 
     floatingWindow.loadFile('./src/renderer/floating/index.html');
-
+    floatingWindow.webContents.openDevTools({ mode: 'detach' });
+    
     floatingWindow.on('closed', () => {
         floatingWindow = null;
     });

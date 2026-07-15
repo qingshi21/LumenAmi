@@ -4,11 +4,21 @@
     <meta charset="UTF-8">
     <title>LumenAmi 桌宠</title>
     <link rel="stylesheet" href="./style.css">
+    <!-- Cubism Core for Live2D -->
+    <script src="./live2d/live2dcubismcore.min.js"></script>
 </head>
 <body>
-    <div class="drag-bar"></div>
+    <!-- 拖拽区域 -->
+    <div class="drag-area top"></div>
+    <div class="drag-area left"></div>
+    <div class="drag-area right"></div>
+    
     <div class="close-btn" id="closeBtn">✕</div>
-    <video class="pet" id="pet" src="./assets/ami.mp4" autoplay loop muted></video>
+
+    <!-- Live2D 渲染容器 -->
+    <div id="live2d-container">
+        <canvas id="live2d-canvas"></canvas>
+    </div>
 
     <!-- 右键菜单 -->
     <div class="context-menu" id="contextMenu">

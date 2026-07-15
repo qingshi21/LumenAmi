@@ -118,6 +118,41 @@
         </div>
     </div>
 
+    <!-- 删除确认弹窗 -->
+    <div id="deleteConfirmModal" class="modal-overlay">
+        <div class="modal modal-small">
+            <div class="modal-header">
+                <span>确认删除</span>
+                <button class="modal-close" id="closeDeleteConfirmBtn">✕</button>
+            </div>
+            <div class="modal-body">
+                <p class="delete-confirm-text" id="deleteConfirmText">确定要删除这个桌宠吗？</p>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn-cancel" id="cancelDeleteBtn">取消</button>
+                <button type="button" class="btn-danger" id="confirmDeleteBtn">删除</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI理解警告弹窗 -->
+    <div id="aiWarningModal" class="modal-overlay">
+        <div class="modal modal-small">
+            <div class="modal-header">
+                <span>⚠️ 提示</span>
+                <button class="modal-close" id="closeAiWarningBtn">✕</button>
+            </div>
+            <div class="modal-body">
+                <p class="delete-confirm-text">联网搜索信息有限，AI理解可能会有偏差，请谨慎使用。</p>
+                <p class="delete-confirm-text" style="margin-top:6px;font-size:12px;opacity:0.6;">是否继续查看 AI 生成的角色理解？</p>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn-cancel" id="cancelAiWarningBtn">取消</button>
+                <button type="button" class="btn-confirm" id="confirmAiWarningBtn">继续查看</button>
+            </div>
+        </div>
+    </div>
+
     <script src="./renderer.js"></script>
 </body>
 </html>

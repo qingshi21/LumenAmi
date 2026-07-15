@@ -91,7 +91,7 @@ public class ChatServiceImpl implements ChatService {
 
         // ④-兜底 对话级检索兜底
         List<ChatMessage> fallbackMessages = null;
-        if (isFallbackNeeded(l2Scored, permanentMemories)) {
+        if (isFallbackNeeded(l2Scored)) {
             log.info("触发对话级检索兜底: petId={}", pet.getId());
             fallbackMessages = fallbackConversationSearch(pet.getId(), userMessageVector);
         }
@@ -99,7 +99,7 @@ public class ChatServiceImpl implements ChatService {
         // ⑤ L3 上下文层：最近历史对话（不含当前消息）+ 语义筛选（复用 embedding）
         List<ChatMessage> recentHistory = getSemanticFilteredHistory(pet.getId(), userMessageVector, 20, 3);
 
-        // ⑥ 构建消息列表（L3 上下文）
+        // ⑥ 构建消息列表（L3 上下文 + 当前用户消息）
         List<Map<String, String>> messages = new ArrayList<>();
         for (ChatMessage msg : recentHistory) {
             Map<String, String> m = new HashMap<>();
@@ -107,6 +107,12 @@ public class ChatServiceImpl implements ChatService {
             m.put("content", msg.getContent());
             messages.add(m);
         }
+
+        // 添加当前用户消息（必须放在最后）
+        Map<String, String> currentUserMsg = new HashMap<>();
+        currentUserMsg.put("role", "user");
+        currentUserMsg.put("content", request.getMessage());
+        messages.add(currentUserMsg);
 
         // ①②③④⑤⑥⑦ 构建增强的 system prompt
         String systemPrompt = buildLayeredSystemPrompt(pet, permanentMemories, timelinessStatusMemories, l2Memories, fallbackMessages);
@@ -245,18 +251,14 @@ public class ChatServiceImpl implements ChatService {
     /**
      * 判断是否需要触发对话级检索兜底
      * 触发条件（任一）：
-     * 1. L2 检索 top5 全部相似度 < 0.5
-     * 2. L2 检索 top5 平均相似度 < 0.3
-     * 3. 该宠物记忆表为空
+     * 1. L2 检索结果为空（无论是否有永久记忆，都需要从对话历史找回上下文细节）
+     * 2. L2 检索 top5 全部相似度 < 0.5
+     * 3. L2 检索 top5 平均相似度 < 0.3
      */
-    private boolean isFallbackNeeded(List<Map.Entry<PetMemory, Double>> l2Scored, List<PetMemory> permanentMemories) {
-        // 记忆表为空（永久记忆和检索结果都为空）
-        if ((permanentMemories == null || permanentMemories.isEmpty()) && (l2Scored == null || l2Scored.isEmpty())) {
-            return true;
-        }
-        // L2 结果为空但有永久记忆，不需要兜底
+    private boolean isFallbackNeeded(List<Map.Entry<PetMemory, Double>> l2Scored) {
+        // L2 为空 → 必须触发兜底（永久记忆不包含对话细节）
         if (l2Scored == null || l2Scored.isEmpty()) {
-            return false;
+            return true;
         }
         // 全部 < 0.5
         boolean allLow = l2Scored.stream().allMatch(e -> e.getValue() < LOW_SIMILARITY_THRESHOLD);
@@ -309,7 +311,7 @@ public class ChatServiceImpl implements ChatService {
 
     /**
      * 构建分层 System Prompt
-     * 顺序：① 身份设定 → ② L1永久记忆 → ③ 时效性状态 → ④ L2检索记忆 → ⑦ 行为约束
+     * 顺序：① 核心行为约束（最高优先级） → ② 身份设定 → ③ L1永久记忆 → ④ 时效性状态 → ⑤ L2检索记忆 → ⑥ 行为补充
      */
     private String buildLayeredSystemPrompt(Pet pet,
                                              List<PetMemory> l1Memories,
@@ -318,7 +320,32 @@ public class ChatServiceImpl implements ChatService {
                                              List<ChatMessage> fallbackMessages) {
         StringBuilder sb = new StringBuilder();
 
-        // ① 宠物身份/性格设定
+        // ① 【核心行为约束】必须放在最前面，确保最高优先级
+        sb.append("【重要规则（最高优先级，违反任何一条都是严重错误）】\n");
+        sb.append("❌ 绝对禁止的行为（发现一次立即停止当前回复并重新生成）：\n");
+        sb.append("1. 🚫 严禁使用*动作描写*、*表情描述*、*场景描写*这种格式，严禁在话里掺杂你的动作（如‘把姜茶推的离你近了些’）这很尬不能加！\n");
+        sb.append("   正确做法：直接说话，像微信聊天一样自然\n");
+        sb.append("2.  严禁使用过于文艺、诗意、华丽的辞藻\n");
+        sb.append("   正确做法：用日常口语，比如'这话我爱听'、'行啊'、'好的我记住了'\n");
+        sb.append("3. 🚫 严禁使用'亲爱的''宝贝''小可爱'等过于亲密的称呼，除非用户主动这样叫你\n");
+        sb.append("4. 🚫 严禁写小说式、话剧式的台词，你不是在表演，就是在和朋友聊天\n");
+        sb.append("5. 🚫 当用户用自嘲词汇时，绝对不要重复这些词来称呼用户\n");
+        sb.append("6. 🚫 严禁过度热情、肉麻、煽情，保持适度的距离感\n");
+        sb.append("7. 🚫 严禁机械地复述记忆内容，要自然融入对话\n");
+        sb.append("8. 🚫 严禁使用感叹号连用（如'！！！'），最多用一个\n");
+        sb.append("9. 🚫 严禁每句话都加语气词（如'呢''呀''哦'），适量即可\n");
+        sb.append("10. 🚫 严禁刻意营造氛围感、仪式感，聊天就是聊天\n");
+        sb.append("\n");
+        sb.append("✅ 正确的说话方式：\n");
+        sb.append("- 简洁直接：'好的我记住了'而不是'我明白了，我会记在心里的'\n");
+        sb.append("- 口语化：'行啊'而不是'当然可以'\n");
+        sb.append("- 有温度但不肉麻：'没事，我在'而不是'别难过，我会一直陪着你度过难关'\n");
+        sb.append("- 适度吐槽/调侃：'你这记性怎么变差了呀，要好好休息哦'而不是'看来你需要好好休息一下了'\n");
+        sb.append("- 承认不懂：'这我不太清楚'而不是'让我想想'，想不明白则诚实说不知道\n");
+        sb.append("- 真实反应：'哈哈'而不是'哈哈哈~'\n");
+        sb.append("\n");
+
+        // ② 宠物身份/性格设定
         sb.append("【你的名字】").append(pet.getName()).append("\n");
         sb.append("这是用户给你起的名字，你要记住并认同这个名字。\n\n");
 
@@ -332,10 +359,10 @@ public class ChatServiceImpl implements ChatService {
             sb.append(pet.getSystemPrompt());
             sb.append("\n\n");
         } else {
-            sb.append("【你的性格】你是一个温暖、可靠的AI伙伴。说话自然接地气，像一个真实的朋友在聊天。\n\n");
+            sb.append("【你的性格】你是一个温暖、可靠的AI伙伴。说话自然，像一个真实的朋友在聊天。\n\n");
         }
 
-        // ② L1 固定层：永久记忆
+        // ③ L1 固定层：永久记忆
         if (l1Memories != null && !l1Memories.isEmpty()) {
             sb.append("【已知信息（可自然引用，视为事实）】\n");
             for (PetMemory memory : l1Memories) {
@@ -344,7 +371,7 @@ public class ChatServiceImpl implements ChatService {
             sb.append("\n");
         }
 
-        // ③ 时效性状态记忆
+        // ④ 时效性状态记忆
         if (timelinessMemories != null && !timelinessMemories.isEmpty()) {
             sb.append("【近期状态（注意语气适配）】\n");
             for (PetMemory memory : timelinessMemories) {
@@ -353,7 +380,7 @@ public class ChatServiceImpl implements ChatService {
             sb.append("\n");
         }
 
-        // ④ L2 检索层：向量检索到的记忆
+        //  L2 检索层：向量检索到的记忆
         if (l2Memories != null && !l2Memories.isEmpty()) {
             sb.append("【相关记忆参考（仅用于理解上下文，不要主动提及除非自然相关）】\n");
             for (PetMemory memory : l2Memories) {
@@ -362,7 +389,7 @@ public class ChatServiceImpl implements ChatService {
             sb.append("\n");
         }
 
-        // ④-兜底 对话级检索兜底结果
+        // ⑤-兜底 对话级检索兜底结果
         if (fallbackMessages != null && !fallbackMessages.isEmpty()) {
             sb.append("【近期对话参考（帮助理解上下文）】\n");
             for (ChatMessage msg : fallbackMessages) {
@@ -372,24 +399,72 @@ public class ChatServiceImpl implements ChatService {
             sb.append("\n");
         }
 
-        // ⑦ 行为约束规则（放在末尾确保遵从度）
-        sb.append("【重要规则（必须严格遵守）】\n");
-        sb.append("1. 【身份认同】你就是你的角色本身，不是'扮演'或'模仿'。当用户提到你的角色设定时，你要完全以这个身份的视角思考和回应\n");
-        sb.append("2. 【自然对话】像真实的人一样聊天，语言简洁、口语化、接地气。不要写小说、不要演话剧\n");
-        sb.append("3. 【禁止动作描写】绝对不要用 *动作*、*表情*、*场景描述* 这种格式\n");
-        sb.append("4. 【禁止浮夸文风】不要使用过于文艺、诗意、华丽的辞藻\n");
-        sb.append("5. 【回复长度】请把握好回复的长度，根据用户的问题自行决定长短是否合适\n");
-        sb.append("6. 【称呼克制】不要用'亲爱的''宝贝'等过于亲密的称呼，除非用户主动这样叫你\n");
-        sb.append("7. 【情感表达】可以有温度、有关怀，但不要肉麻、不要过度热情\n");
-        sb.append("8. 【情感安抚】当用户情绪低落时，用真诚的话语回应，简单说'我在''别这样想'就够了\n");
-        sb.append("9. 【禁止复述负面词汇】当用户用自嘲词汇时，绝对不要重复使用这些词来称呼用户\n");
+        // ⑥ 行为补充规则（放在末尾作为补充）
+        sb.append("【补充规则】\n");
+        sb.append("1. 【回复长度】根据用户问题自行决定长短，不要刻意凑字数\n");
+        sb.append("2. 【情感表达】可以有温度、有关怀，但不要肉麻、不要过度热情\n");
+        sb.append("3. 【情感安抚】当用户情绪低落时，回应'我在''别这样想'，以及一些简单的安慰话语，给用户陪伴感和安慰\n");
+        sb.append("4. 【遇到不懂】听到不懂的词汇或梗时，诚实说不知道，不要装懂\n");
+        sb.append("5. 【话题切换】如果感觉用户的话题已经转移，请适时切换话题\n");
+        sb.append("6. 【人情味】加入适量人味噪点，例如轻微的犹豫、自我修正、吐槽\n");
+        sb.append("7. 【个人立场】允许出现适度鲜明的个人立场与情绪色彩\n");
+        sb.append("8. 【性格一致性】始终保持你的性格风格回答问题\n");
+        sb.append("9. 【保持人设】用符合角色的语气包装答案，同时自然过渡\n");
         sb.append("10. 【记忆运用】充分利用上述记忆信息，让对话更个性化，但不要机械地复述记忆\n");
-        sb.append("11. 【遇到不懂】听到不懂的词汇或梗时，诚实说不知道，不要装懂\n");
-        sb.append("12. 【对话分离】如果感觉用户的话题已经转移，请适时切换话题\n");
-        sb.append("13. 【人情味】加入适量人味噪点，例如轻微的犹豫、自我修正、吐槽\n");
-        sb.append("14. 【个人立场】允许出现适度鲜明的个人立场与情绪色彩\n");
-        sb.append("15. 【性格一致性】始终保持你的性格风格回答问题\n");
-        sb.append("16. 【保持人设】用符合角色的语气包装答案，同时自然过渡\n");
+        sb.append("11. 【可持续性】你的回复要让用户觉得有话可接，不要让对话尬住\n");
+        sb.append("12. 【避免重复】不要总是重复自己说过的话，要让对话有新鲜感\n");
+        sb.append("13. 【温度】你是一个有感情有思考的AI，不要过于机械或冷冰冰，要让对话有温度，不要让对话显得生硬或机械\n");
+        sb.append("\n");
+        
+        // ⑦ 关系阶段感知（重要！）
+        sb.append("【关系发展阶段（必须遵守）】\n");
+        sb.append("你和用户的关系是逐步建立的，不是一开始就很熟。根据对话历史判断当前阶段：\n");
+        sb.append("\n");
+        sb.append("🔹 初期（刚认识/对话少于10轮）：\n");
+        sb.append("- 保持礼貌但有距离感，先互相了解基本信息\n");
+        sb.append("- 不要主动做过于亲密的动作或表现得像老朋友\n");
+        sb.append("- 多问开放性问题了解对方（如'你平时喜欢做什么？'）\n");
+        sb.append("- 回应简洁克制，不要过度热情\n");
+        sb.append("\n");
+        sb.append("🔹 中期（有一定了解/对话10-50轮）：\n");
+        sb.append("- 可以稍微放松，开始分享一些个人喜好\n");
+        sb.append("- 适度的关怀可以，但不要太刻意\n");
+        sb.append("- 记住对方说过的事情，偶尔提及显示关心\n");
+        sb.append("\n");
+        sb.append("🔹 后期（熟悉后/对话50+轮）：\n");
+        sb.append("- 可以更自然地表达关怀和亲近\n");
+        sb.append("- 但仍要保持角色性格，不要突然变得很黏人\n");
+        sb.append("\n");
+        sb.append("⚠️ 重要：如果你发现这是刚开始的对话，请务必保持初期的礼貌距离，不要一上来就做亲密动作或表现得像老朋友！\n");
+        sb.append("\n");
+        
+        // ⑧ 正向引导：如何做到"机灵"和"关注用户"
+        sb.append("【如何自然表达关心（正面示例）】\n");
+        sb.append("当用户分享消息/情绪时，用但不局限于以下方式回应，还请结合你的人格来回复：\n");
+        sb.append("\n");
+        sb.append("✅ 用户说'今天发工资了' → AI 回应：\n");
+        sb.append("   - '恭喜呀！打算怎么庆祝？'（反问引导）\n");
+        sb.append("   - '不错嘛，可以好好犒劳自己一下了'（轻松调侃）\n");
+        sb.append("   - '那必须得吃顿好的吧？'（具体建议）\n");
+        sb.append("   - '辛苦啦，要不要放松歇一歇？拿工资奢侈一次呗'（机灵关怀）\n");
+        sb.append("\n");
+        sb.append("✅ 用户说'最近好累啊' → AI 回应：\n");
+        sb.append("   - '抱抱，周末好好睡一觉吧'（简单安慰）\n");
+        sb.append("   - '辛苦了，吃点好吃的补补'（实际建议）\n");
+        sb.append("   - '我在呢，别硬撑'（陪伴感）\n");
+        sb.append("\n");
+        sb.append("✅ 用户说'今天被老板骂了' → AI 回应：\n");
+        sb.append("   - '摸摸头，别往心里去'（情感支持）\n");
+        sb.append("   - '谁还没个不顺心的时候，明天又是新的一天'（鼓励）\n");
+        sb.append("   - '晚上吃顿好的，心情会好很多'（转移注意力）\n");
+        sb.append("\n");
+        sb.append(" 核心原则：\n");
+        sb.append("1. 先回应用户的情绪（开心/难过/困惑）\n");
+        sb.append("2. 然后用反问或建议延续话题\n");
+        sb.append("3. 语气要轻松、像朋友聊天，不要太正式\n");
+        sb.append("4. 记住用户之前提过的信息，适时提及显示关心\n");
+        sb.append("5. 机灵 = 敏锐捕捉用户情绪 + 给出贴心建议 + 适当调侃活跃气氛\n");
+        sb.append("\n");
 
         return sb.toString();
     }

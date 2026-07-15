@@ -692,6 +692,27 @@ body::after {
     transform: scale(0.98);
 }
 
+/* 危险按钮（红色） */
+.modal-actions .btn-danger {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #e74c3c, #c0392b);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+.modal-actions .btn-danger:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 20px rgba(231, 76, 60, 0.3);
+}
+.modal-actions .btn-danger:active {
+    transform: scale(0.98);
+}
+
 .modal form .error-msg {
     min-height: 18px;
     margin-top: 2px;
@@ -701,6 +722,21 @@ body::after {
 .modal-large {
     max-width: 600px;
     width: 90%;
+}
+
+/* 小模态框（删除确认） */
+.modal-small {
+    max-width: 380px;
+    width: 90%;
+}
+
+.delete-confirm-text {
+    font-size: 14px;
+    font-weight: 400;
+    color: #F6F2ED;
+    line-height: 1.6;
+    text-align: center;
+    padding: 10px 0;
 }
 
 .understanding-tip {
